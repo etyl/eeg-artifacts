@@ -17,7 +17,7 @@ class PipelineConfig:
     recording_ids: Sequence[int] = (0, 1)
 
     window_length_seconds: int = 30
-    window_stride_seconds: int = 4
+    window_stride_seconds: int = 30
 
     batch_size: int = 64
     num_workers: int = 20
@@ -57,6 +57,7 @@ def define_encoder(
         encoder = CBraMod.from_pretrained(
             "braindecode/cbramod-pretrained",
             return_encoder_output=True,
+            n_chans=36,
         )
     elif encoder_name == "BENDR":
         encoder = BENDR.from_pretrained(
@@ -113,7 +114,7 @@ def compute_embeddings(
     embeddings = []
     encoder.eval()
     with torch.no_grad():
-        for batch_x, _, _ in data_loader:
+        for batch_x, _ in data_loader:
             if encoder_name == "BENDR":
                 emb = encoder.encoder(batch_x)
             elif encoder_name == "REVE":
@@ -123,6 +124,7 @@ def compute_embeddings(
                 layer_outputs = encoder(eeg_norm, pos, return_output=True)
                 emb = layer_outputs[-1].mean(dim=1)
             else:
+                ipdb.set_trace()
                 emb = encoder(batch_x)
 
             if isinstance(emb, (tuple, list)):
