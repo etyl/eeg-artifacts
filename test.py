@@ -6,12 +6,13 @@ from pathlib import Path
 import numpy as np
 import torch
 from braindecode.datasets import BaseConcatDataset, TUHAbnormal
-from braindecode.models import CBraMod
+from braindecode.models import CBraMod, REVE
 from braindecode.preprocessing import create_fixed_length_windows
 
 
 DEFAULT_DATASET_PATH = "/data/parietal/store2/data/tuh_eeg_abnormal"
 DEFAULT_CBRAMOD_REPO = "braindecode/cbramod-pretrained"
+DEFAULT_REVE_REPO = "brain-bzh/reve-base"
 DEFAULT_PATCH_SIZE = 200
 
 
@@ -21,7 +22,7 @@ def parse_args():
     )
     parser.add_argument("--dataset-path", default=DEFAULT_DATASET_PATH)
     parser.add_argument("--dataset-version", default="v3.0.1")
-    parser.add_argument("--model", default="cbramod")
+    parser.add_argument("--model", default="reve")
     parser.add_argument("--window-size-s", type=float, default=60.0)
     parser.add_argument("--window-stride-s", type=float, default=60.0)
     parser.add_argument("--max-recordings", type=int, default=4)
@@ -88,7 +89,17 @@ def get_window_params(dataset: BaseConcatDataset, args):
 def get_model(args, n_chans: int, n_times: int):
     if args.model == "cbramod":
         return CBraMod.from_pretrained(
-            args.pretrained_repo,
+            DEFAULT_CBRAMOD_REPO,
+            n_chans=n_chans,
+            n_times=n_times,
+            n_outputs=2,
+            return_encoder_output=True,
+            strict=False,
+            local_files_only=args.local_files_only,
+        )
+    if args.model == "reve":
+        return REVE.from_pretrained(
+            DEFAULT_REVE_REPO,
             n_chans=n_chans,
             n_times=n_times,
             n_outputs=2,
