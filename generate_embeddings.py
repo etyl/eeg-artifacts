@@ -12,6 +12,7 @@ from torch.utils.data import DataLoader
 
 
 DEFAULT_DATASET_PATH = "/data/parietal/store2/data/tuh_eeg_abnormal"
+DEFAULT_OUTPUT_DIR = "/data/parietal/store2/data/tuh_eeg_abnormal/embeddings"
 DEFAULT_CBRAMOD_REPO = "braindecode/cbramod-pretrained"
 DEFAULT_REVE_REPO = "brain-bzh/reve-base"
 DEFAULT_PATCH_SIZE = 200
@@ -28,7 +29,7 @@ def parse_args():
     parser.add_argument("--window-stride-s", type=float, default=60.0)
     parser.add_argument("--max-recordings", type=int, default=2)
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
-    parser.add_argument("--output-dir", default="artifacts/")
+    parser.add_argument("--output-dir", default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--local-files-only", action="store_true")
     return parser.parse_args()
 
@@ -183,6 +184,7 @@ def main():
             ),
         )
 
+
         with torch.no_grad():
             for batch_x in dataloader:
                 batch_x = batch_x.to(args.device)
@@ -216,16 +218,19 @@ def main():
 
     output_dir = Path(args.output_dir) / f"{args.model}_embeddings"
     output_dir.mkdir(parents=True, exist_ok=True)
-    np.save(output_dir / "embeddings.npy", embedding_array)
-    with open(output_dir / "metadata.json", "w", encoding="ascii") as handle:
+    # add window size
+    np.save(output_dir / f"embeddings_npatients{args.max_recordings}_nseconds{args.window_size_s}.npy", embedding_array)
+    with open(output_dir / f"metadata_{args.max_recordings}_nseconds{args.window_size_s}.json", "w", encoding="ascii") as handle:
         json.dump(metadata, handle, indent=2)
-    with open(output_dir / "args.json", "w", encoding="ascii") as handle:
+    with open(output_dir / f"args_{args.max_recordings}_nseconds{args.window_size_s}.json", "w", encoding="ascii") as handle:
         json.dump(vars(args), handle, indent=2)
 
-    print(f"Saved embeddings to {output_dir / 'embeddings.npy'}")
-    print(f"Saved metadata to {output_dir / 'metadata.json'}")
+    # save with args.max-recordings in the filename for clarity and 
+    print(f"Saved embeddings to {output_dir / f'embeddings_{args.max_recordings}_{args.model}.npy'}")
+    print(f"Saved metadata to {output_dir / f'metadata_{args.max_recordings}_{args.model}.json'}")
     print(f"Embedding shape: {embedding_array.shape}")
     print(f"Kept {min_windows} windows per patient")
+
 
 
 if __name__ == "__main__":
