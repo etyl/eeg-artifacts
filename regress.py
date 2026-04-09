@@ -12,6 +12,7 @@ from sklearn.manifold import TSNE
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import LinearSVC
 from sklearn.neural_network import MLPClassifier
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, roc_auc_score
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, roc_auc_score, roc_curve
@@ -31,8 +32,12 @@ BASE = Path("~/Documents/INRIA/retreat/embeddings").expanduser()
  
 MODEL_PATHS = {
     "cbramod": {
-        "embeddings": BASE / "embeddings_npatients2993_nseconds60.0.npy",
-        "metadata":   BASE / "metadata_npatients2993_nseconds60.0.json",
+        "embeddings": BASE / "cbramod_embeddings"/ "embeddings_npatients2993_nseconds60.0.npy",
+        "metadata":   BASE / "cbramod_embeddings" / "metadata_2993_nseconds60.0.json",
+    },
+    "cbramod_30": {
+        "embeddings": BASE / "cbramod_embeddings" / "embeddings_npatients2993_nseconds30.0.npy",
+        "metadata":   BASE / "cbramod_embeddings" / "metadata_2993_nseconds30.0.json",
     },
     "reve": {
         "embeddings": BASE / "reve_embeddings" / "embeddings.npy",
@@ -125,6 +130,7 @@ plt.rcParams.update({"font.size": FONT_SIZE})
 clfs = {
     "LogisticRegression": LogisticRegression(max_iter=1000, random_state=RANDOM_STATE),
     "LinearSVC":          LinearSVC(max_iter=2000, random_state=RANDOM_STATE),
+    "RandomForest":       RandomForestClassifier(n_estimators=100, random_state=RANDOM_STATE),
     "MLP":                MLPClassifier(hidden_layer_sizes=(128, 64), max_iter=500,
                                         random_state=RANDOM_STATE),
 }
@@ -183,9 +189,10 @@ fig, ax = plt.subplots(figsize=(10, 8))
 for cls, color, lbl in [(0, "#1f77b4", "normal"), (1, "#d62728", "pathological")]:
     mask = labels == cls
     ax.scatter(coords[mask, 0], coords[mask, 1],
-               s=8, alpha=0.6, c=color, label=lbl, edgecolors="none")
-ax.set_title(f"t-SNE — {model_name} — patient embeddings (n={n_patients})", fontsize=13)
-ax.set_xlabel("t-SNE 1"); ax.set_ylabel("t-SNE 2")
+               s=13, alpha=0.6, c=color, label=lbl, edgecolors="none")
+ax.set_title(f"t-SNE — {model_name} — patient embeddings (n={n_patients})", fontsize=FONT_SIZE)
+ax.set_xlabel("t-SNE 1", fontsize=FONT_SIZE)
+ax.set_ylabel("t-SNE 2", fontsize=FONT_SIZE)
 ax.legend(frameon=False, markerscale=2)
 ax.grid(alpha=0.2, linestyle=":")
 fig.tight_layout()
@@ -201,10 +208,10 @@ fig, ax = plt.subplots(figsize=(10, 8))
 for cls, color, label in [(0, "#1f77b4", "normal"), (1, "#d62728", "pathological")]:
     mask = labels == cls
     ax.scatter(umap_coords[mask, 0], umap_coords[mask, 1],
-               s=8, alpha=0.6, c=color, label=label, edgecolors="none")
-ax.set_title(f"UMAP — {model_name} — patient embeddings (n={n_patients})", fontsize=13)
-ax.set_xlabel("UMAP 1")
-ax.set_ylabel("UMAP 2")
+               s=13, alpha=0.6, c=color, label=label, edgecolors="none")
+ax.set_title(f"UMAP — {model_name} — patient embeddings (n={n_patients})", fontsize=FONT_SIZE)
+ax.set_xlabel("UMAP 1", fontsize=FONT_SIZE)
+ax.set_ylabel("UMAP 2", fontsize=FONT_SIZE)
 ax.legend(frameon=False, markerscale=2)
 ax.grid(alpha=0.2, linestyle=":")
 fig.tight_layout()
