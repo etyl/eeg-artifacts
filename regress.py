@@ -46,7 +46,7 @@ MODEL_PATHS = {
 }
  
 RANDOM_STATE = 42
- 
+FONT_SIZE = 18
 # ── Parse argument ────────────────────────────────────────────────────────────
 if len(sys.argv) < 2 or sys.argv[1].lower() not in MODEL_PATHS:
     print(f"Usage: python {sys.argv[0]} <model>")
@@ -85,32 +85,34 @@ elif raw.ndim == 3:
 else:
     raise ValueError(f"Unexpected embeddings shape: {raw.shape}")
  
-labels      = np.array([int(m["pathological"]) for m in metadata])
-X_win       = embeddings.reshape(-1, emb_dim)
-y_win       = np.repeat(labels, n_windows)
-patient_ids = np.repeat(np.arange(n_patients), n_windows)
+labels       = np.array([int(m["pathological"]) for m in metadata])
+is_train     = np.array([bool(m["train"])        for m in metadata])
  
 print(f"  patients={n_patients}, windows/patient={n_windows}, dim={emb_dim}")
+print(f"  train={is_train.sum()}  eval={(~is_train).sum()}")
 print(f"  pathological={labels.sum()}  normal={n_patients - labels.sum()}")
  
-# ── 2. Patient-level train/eval split (no leakage) ────────────────────────────
-train_patients, eval_patients = train_test_split(
-    np.arange(n_patients), test_size=0.2,
-    random_state=RANDOM_STATE, stratify=labels
-)
+# ── 2. Split using official train/eval flag from metadata ─────────────────────
+train_patients = np.where( is_train)[0]
+eval_patients  = np.where(~is_train)[0]
+ 
+patient_ids = np.repeat(np.arange(n_patients), n_windows)
+X_win       = embeddings.reshape(-1, emb_dim)
+y_win       = np.repeat(labels, n_windows)
  
 train_mask     = np.isin(patient_ids, train_patients)
 eval_mask      = np.isin(patient_ids, eval_patients)
 X_tr, y_tr     = X_win[train_mask], y_win[train_mask]
-X_ev, y_ev     = X_win[eval_mask],  y_win[eval_mask]
+X_ev           = X_win[eval_mask]
 patient_ids_ev = patient_ids[eval_mask]
+ 
+eval_patient_labels = labels[eval_patients]
  
 scaler  = StandardScaler()
 X_tr_sc = scaler.fit_transform(X_tr)
 X_ev_sc = scaler.transform(X_ev)
  
-eval_patient_labels = labels[eval_patients]
-print(f"\n  Train windows={len(y_tr)}  Eval windows={len(y_ev)}")
+print(f"\n  Train windows={len(y_tr)}  Eval windows={len(X_ev)}")
  
 # ── Helpers ───────────────────────────────────────────────────────────────────
 def patient_avg_probs(win_probs, patient_ids_ev, eval_patients):
@@ -121,16 +123,12 @@ def patient_avg_probs(win_probs, patient_ids_ev, eval_patients):
 def youden_threshold(fpr, tpr, thresholds):
     idx = np.argmax(tpr - fpr)
     return thresholds[idx], tpr[idx], fpr[idx]
-
-# ADD fonttsize to imrpove the quality of the plots for the paper
-FONT_SIZE = 18
-plt.rcParams.update({"font.size": FONT_SIZE})
-
+ 
 # ── 3. Classifiers + ROC curves ───────────────────────────────────────────────
 clfs = {
     "LogisticRegression": LogisticRegression(max_iter=1000, random_state=RANDOM_STATE),
     "LinearSVC":          LinearSVC(max_iter=2000, random_state=RANDOM_STATE),
-    "RandomForest":       RandomForestClassifier(n_estimators=100, random_state=RANDOM_STATE),
+    "Random Forest":    RandomForestClassifier(n_estimators=100, random_state=RANDOM_STATE),
     "MLP":                MLPClassifier(hidden_layer_sizes=(128, 64), max_iter=500,
                                         random_state=RANDOM_STATE),
 }
@@ -148,10 +146,10 @@ for name, clf in clfs.items():
         score     = clf.decision_function(X_ev_sc)
         win_probs = (score - score.min()) / (score.max() - score.min() + 1e-9)
  
-    pat_probs               = patient_avg_probs(win_probs, patient_ids_ev, eval_patients)
-    fpr, tpr, thresholds    = roc_curve(eval_patient_labels, pat_probs)
-    auc                     = roc_auc_score(eval_patient_labels, pat_probs)
-    best_thresh, b_tpr, b_fpr = youden_threshold(fpr, tpr, thresholds)
+    pat_probs                  = patient_avg_probs(win_probs, patient_ids_ev, eval_patients)
+    fpr, tpr, thresholds       = roc_curve(eval_patient_labels, pat_probs)
+    auc                        = roc_auc_score(eval_patient_labels, pat_probs)
+    best_thresh, b_tpr, b_fpr  = youden_threshold(fpr, tpr, thresholds)
  
     acc_50  = accuracy_score(eval_patient_labels, (pat_probs >= 0.50).astype(int))
     acc_opt = accuracy_score(eval_patient_labels, (pat_probs >= best_thresh).astype(int))
@@ -173,7 +171,6 @@ roc_path = output_dir / "roc_curves.png"
 fig_roc.savefig(roc_path, dpi=200)
 plt.close(fig_roc)
 print(f"\n  ROC curves saved to {roc_path}")
-
 # 4. t-SNE
 print("\nRunning t-SNE (this may take a minute)…")
 X_mean = embeddings.mean(axis=1)
